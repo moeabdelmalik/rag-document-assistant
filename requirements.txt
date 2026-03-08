@@ -5,3 +5,7 @@ chromadb
 python-dotenv
 pypdf
 sentence-transformers
+langchain-huggingface
+langchain-text-splitters
+streamlit
+langchain-core

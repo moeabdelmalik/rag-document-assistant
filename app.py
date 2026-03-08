@@ -7,8 +7,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_groq import ChatGroq
-from langchain_core.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 
 # Load the API key from the .env file
 load_dotenv()
@@ -56,10 +57,11 @@ def retrieve(vector_store, question):
 # --- FUNCTION 5: GENERATE ---
 def generate(vector_store, question):
     llm = ChatGroq(
-        model_name="llama3-8b-8192",
+        model_name="llama-3.3-70b-versatile",
         api_key=os.getenv("GROQ_API_KEY")
     )
-    prompt_template = """
+
+    prompt = ChatPromptTemplate.from_template("""
     Use the following context to answer the question.
     If you don't know the answer, just say "I don't know."
     Don't make up answers.
@@ -69,22 +71,18 @@ def generate(vector_store, question):
 
     Question:
     {question}
+    """)
 
-    Answer:
-    """
-    prompt = PromptTemplate(
-        template=prompt_template,
-        input_variables=["context", "question"]
-    )
-    chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vector_store.as_retriever(search_kwargs={"k": 3}),
-        chain_type_kwargs={"prompt": prompt}
-    )
-    answer = chain.invoke({"query": question})
-    return answer["result"]
+    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
+    chain = (
+        {"context": retriever, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    return chain.invoke(question)
 
 # --- STREAMLIT UI ---
 
